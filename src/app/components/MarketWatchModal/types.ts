@@ -36,4 +36,5 @@ export interface MarketWatchModalProps {
     closePosition: (ticket: number) => Promise<boolean>;
     autoTradeUnsubscribe?: (comments: string[]) => Promise<void>;
     mt5Account?: MT5Account | null;
+    addTradeToHistory?: (entry: any) => Promise<boolean>;
 }

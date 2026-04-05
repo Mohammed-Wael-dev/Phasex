@@ -28,7 +28,7 @@ export function TradingDashboard({ onLogout, onOpenDynamics }: TradingDashboardP
         pickAsset, tradeError, clearTradeError,
         isSubscriptionOpen, setIsSubscriptionOpen, isProfileOpen, setIsProfileOpen,
         showMarketWatch, setShowMarketWatch,
-        mt5Positions, autoTrades, autoFlipCounts, closePosition, autoTradeUnsubscribe, mt5Account,
+        mt5Positions, autoTrades, autoFlipCounts, closePosition, autoTradeUnsubscribe, mt5Account, addTradeToHistory,
         aiMarketContext, mtfEnabled, mtfSmallTimeframe, mtfLargeTimeframe,
         setQuickTradeModal, setQtSL, setQtTP, setQtLot, setQtSymbol, setQtError,
     } = ctx;
@@ -190,6 +190,7 @@ export function TradingDashboard({ onLogout, onOpenDynamics }: TradingDashboardP
         closePosition={closePosition} 
         autoTradeUnsubscribe={autoTradeUnsubscribe}
         mt5Account={mt5Account}
+        addTradeToHistory={addTradeToHistory}
       />
     </div>
     </>

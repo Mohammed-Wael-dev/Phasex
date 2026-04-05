@@ -19,6 +19,7 @@ export function MarketWatchModal({
     closePosition,
     autoTradeUnsubscribe,
     mt5Account,
+    addTradeToHistory,
 }: MarketWatchModalProps) {
     const tk = useThemeTokens();
     const [closingSymbols, setClosingSymbols] = useState<Set<string>>(new Set());
@@ -34,7 +35,7 @@ export function MarketWatchModal({
     const handleCloseAuto = async (symbol: string) => {
         setClosingAutoSymbols((prev) => new Set(prev).add(symbol));
         const commentsToStop = serverAutoTrades
-            .filter((at) => at.symbol === symbol && at.is_active)
+            .filter((at) => at.symbol === symbol)
             .map((at) => at.comment)
             .filter(Boolean) as string[];
 
@@ -51,7 +52,29 @@ export function MarketWatchModal({
     const handleCloseAll = async (symbol: string, tickets: number[]) => {
         setClosingSymbols((prev) => new Set(prev).add(symbol));
         for (const t of tickets) {
-            await closePosition(t);
+            const pos = mt5Positions.find((p) => p.ticket === t);
+            if (!pos) continue;
+            
+            const success = await closePosition(t);
+            if (success && addTradeToHistory) {
+                addTradeToHistory({
+                    id: `close-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                    symbol: pos.symbol,
+                    tf: "-",
+                    action: pos.type === "BUY" ? "Buy" : "Sell",
+                    volume: pos.volume,
+                    entryPrice: pos.open_price,
+                    sl: pos.sl || null,
+                    tp: pos.tp || null,
+                    ticket: pos.ticket,
+                    status: "closed",
+                    executedAt: pos.time_open || new Date().toISOString(),
+                    signalPrice: pos.open_price,
+                    profit: pos.profit,
+                    closePrice: pos.current_price,
+                    closedAt: new Date().toISOString(),
+                });
+            }
         }
         setClosingSymbols((prev) => {
             const n = new Set(prev);
