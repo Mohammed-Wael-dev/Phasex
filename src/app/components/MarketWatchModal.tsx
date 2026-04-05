@@ -34,14 +34,38 @@ export function MarketWatchModal({
 
     const handleCloseAuto = async (symbol: string) => {
         setClosingAutoSymbols((prev) => new Set(prev).add(symbol));
+        
+        const normSymbol = symbol.toUpperCase().replace(/\.(raw|p|sd|lv)|micro|m$/i, "");
+        
         const commentsToStop = serverAutoTrades
-            .filter((at) => at.symbol === symbol)
+            .filter((at) => {
+                if (!at.symbol) return false;
+                const atNorm = at.symbol.toUpperCase().replace(/\.(raw|p|sd|lv)|micro|m$/i, "");
+                return atNorm.includes(normSymbol) || normSymbol.includes(atNorm);
+            })
             .map((at) => at.comment)
             .filter(Boolean) as string[];
 
-        if (commentsToStop.length > 0 && autoTradeUnsubscribe) {
-            await autoTradeUnsubscribe(commentsToStop);
+        const rowData = aggregated.find((r) => r.symbol === symbol);
+        if (rowData && rowData.autoTickets.length > 0) {
+            rowData.autoTickets.forEach((t) => {
+                const p = mt5Positions.find((pos) => pos.ticket === t);
+                if (p?.comment) {
+                    commentsToStop.push(p.comment);
+                }
+            });
         }
+
+        const uniqueComments = Array.from(new Set(commentsToStop));
+
+        if (uniqueComments.length > 0 && autoTradeUnsubscribe) {
+            try {
+                await autoTradeUnsubscribe(uniqueComments);
+            } catch (error) {
+                console.error("Error stopping auto trade:", error);
+            }
+        }
+
         setClosingAutoSymbols((prev) => {
             const n = new Set(prev);
             n.delete(symbol);
@@ -51,36 +75,47 @@ export function MarketWatchModal({
 
     const handleCloseAll = async (symbol: string, tickets: number[]) => {
         setClosingSymbols((prev) => new Set(prev).add(symbol));
-        for (const t of tickets) {
-            const pos = mt5Positions.find((p) => p.ticket === t);
-            if (!pos) continue;
-            
-            const success = await closePosition(t);
-            if (success && addTradeToHistory) {
-                addTradeToHistory({
-                    id: `close-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                    symbol: pos.symbol,
-                    tf: "-",
-                    action: pos.type === "BUY" ? "Buy" : "Sell",
-                    volume: pos.volume,
-                    entryPrice: pos.open_price,
-                    sl: pos.sl || null,
-                    tp: pos.tp || null,
-                    ticket: pos.ticket,
-                    status: "closed",
-                    executedAt: pos.time_open || new Date().toISOString(),
-                    signalPrice: pos.open_price,
-                    profit: pos.profit,
-                    closePrice: pos.current_price,
-                    closedAt: new Date().toISOString(),
-                });
+        try {
+            for (const t of tickets) {
+                const pos = mt5Positions.find((p) => p.ticket === t);
+                if (!pos) continue;
+                
+                try {
+                    const success = await closePosition(t);
+                    if (success && addTradeToHistory) {
+                        try {
+                            await addTradeToHistory({
+                                id: `close-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                                symbol: pos.symbol,
+                                tf: "-",
+                                action: pos.type === "BUY" ? "Buy" : "Sell",
+                                volume: pos.volume,
+                                entryPrice: pos.open_price,
+                                sl: pos.sl || null,
+                                tp: pos.tp || null,
+                                ticket: pos.ticket,
+                                status: "closed",
+                                executedAt: pos.time_open || new Date().toISOString(),
+                                signalPrice: pos.open_price,
+                                profit: pos.profit,
+                                closePrice: pos.current_price,
+                                closedAt: new Date().toISOString(),
+                            });
+                        } catch (historyErr) {
+                            console.error("History logging failed:", historyErr);
+                        }
+                    }
+                } catch (posErr) {
+                    console.error(`Failed to close position ${t}:`, posErr);
+                }
             }
+        } finally {
+            setClosingSymbols((prev) => {
+                const n = new Set(prev);
+                n.delete(symbol);
+                return n;
+            });
         }
-        setClosingSymbols((prev) => {
-            const n = new Set(prev);
-            n.delete(symbol);
-            return n;
-        });
     };
 
     if (!isOpen) return null;
