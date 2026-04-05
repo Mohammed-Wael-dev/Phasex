@@ -367,6 +367,10 @@ export function useMT5(): UseMT5Result {
             });
             const data = await safeJson(res);
             if (handleSessionExpired(data, res)) return;
+            if (data.syncing) {
+                // Do not overwrite positions if the server is temporarily syncing
+                return;
+            }
             if (mountedRef.current && data.positions) {
                 setPositions(data.positions);
             }

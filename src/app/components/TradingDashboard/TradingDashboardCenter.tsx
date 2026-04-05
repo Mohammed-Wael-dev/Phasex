@@ -293,14 +293,22 @@ export function TradingDashboardCenter({ ctx }: { ctx: TradingDashboardCtx }) {
                 clearServerHistory={clearServerHistory}
                 fetchTradeHistory={fetchTradeHistory}
                 addAutoTrade={async (key, symbol, tf, lot, direction, signalPrice, sl, tp, ticket) => {
+                  const mapSubTf = (tfStr: string) => {
+                    const m: Record<string, string> = { "1m": "M1", "5m": "M5", "15m": "M15", "30m": "M30", "1H": "H1", "4H": "H4", "1D": "D1", "1W": "W1", "1M": "MN1" };
+                    return m[tfStr] || tfStr;
+                  };
                   const res = await autoTradeSubscribe([{
-                    symbol, main_tf: mtfEnabled ? formatTfStr(mtfLargeTimeframe) : formatTfStr(timeframe >= 60 ? timeframe : 60), sub_tf: tf, window_size: 10, direction, lot_size: lot, sl: sl || undefined, comment: `PX-Dash ${symbol} ${tf}`.slice(0, 31)
+                    symbol, main_tf: mtfEnabled ? formatTfStr(mtfLargeTimeframe) : formatTfStr(timeframe >= 60 ? timeframe : 60), sub_tf: mapSubTf(tf), window_size: 10, direction, lot_size: lot, sl: sl || undefined, comment: `PX-Dash ${symbol} ${tf}`.slice(0, 31)
                   }]);
                   return res.errors.length === 0;
                 }}
                 addAutoTradesBulk={async (trades) => {
+                  const mapSubTf = (tfStr: string) => {
+                    const m: Record<string, string> = { "1m": "M1", "5m": "M5", "15m": "M15", "30m": "M30", "1H": "H1", "4H": "H4", "1D": "D1", "1W": "W1", "1M": "MN1" };
+                    return m[tfStr] || tfStr;
+                  };
                   const res = await autoTradeSubscribe(trades.map(t => ({
-                    symbol: t.symbol, main_tf: mtfEnabled ? formatTfStr(mtfLargeTimeframe) : formatTfStr(timeframe >= 60 ? timeframe : 60), sub_tf: t.tf, window_size: 10, direction: t.direction, lot_size: t.lot, sl: t.sl || undefined, comment: `PX-Dash ${t.symbol} ${t.tf}`.slice(0, 31)
+                    symbol: t.symbol, main_tf: mtfEnabled ? formatTfStr(mtfLargeTimeframe) : formatTfStr(timeframe >= 60 ? timeframe : 60), sub_tf: mapSubTf(t.tf), window_size: 10, direction: t.direction, lot_size: t.lot, sl: t.sl || undefined, comment: `PX-Dash ${t.symbol} ${t.tf}`.slice(0, 31)
                   })));
                   return res.errors.length === 0;
                 }}
