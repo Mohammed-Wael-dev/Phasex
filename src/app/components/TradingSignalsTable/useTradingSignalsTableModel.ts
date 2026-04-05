@@ -92,140 +92,6 @@ export function useTradingSignalsTableModel({
         });
     }, [signalData]);
 
-    const handleExecuteAll = useCallback(async () => {
-        if (!executeTrade || !mt5Connected || executingAssetBulk || isExecutingAll) return;
-        setIsExecutingAll(true);
-        try {
-            const assetsToProcess =
-                marketFilter !== "ALL"
-                    ? allAssetNames.filter((a) => Object.values(signalData[a]).some((e) => e.market === marketFilter))
-                    : allAssetNames;
-
-            // We basically do what handleExecuteAsset does but for all filtered assets
-            const assets = assetsToProcess.filter((a) => {
-                if (assetFilter !== "ALL" && a !== assetFilter) return false;
-                if (searchQuery && !a.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-                return true;
-            });
-
-            for (const asset of assets) {
-                const tfs = signalData[asset];
-                if (!tfs) continue;
-                let tfKeys = Object.keys(tfs).sort(sortTF);
-                if (actionFilter !== "ALL") tfKeys = tfKeys.filter((tf) => tfs[tf].net_signal === actionFilter);
-                if (tfFilter !== "ALL") tfKeys = tfKeys.filter((tf) => tf === tfFilter);
-
-                for (const tf of tfKeys) {
-                    const entry = tfs[tf];
-                    if (!entry.net_signal) continue;
-                    // handleExecuteTrade sets its own state, but we'll wait for it
-                    await handleExecuteTrade(asset, tf, entry, false);
-                }
-            }
-        } finally {
-            setIsExecutingAll(false);
-        }
-    }, [executeTrade, mt5Connected, executingAssetBulk, isExecutingAll, marketFilter, allAssetNames, signalData, assetFilter, searchQuery, actionFilter, tfFilter, handleExecuteTrade]);
-
-    const handleAutoAll = useCallback(async () => {
-        if (!addAutoTrade || !mt5Connected || executingAssetBulk || globalAutoCooldown || isAutoExecutingAll) return;
-        setGlobalAutoCooldown(true);
-        setTimeout(() => setGlobalAutoCooldown(false), 7000);
-        setIsAutoExecutingAll(true);
-
-        try {
-            const assetsToProcess =
-                marketFilter !== "ALL"
-                    ? allAssetNames.filter((a) => Object.values(signalData[a]).some((e) => e.market === marketFilter))
-                    : allAssetNames;
-
-            const assets = assetsToProcess.filter((a) => {
-                if (assetFilter !== "ALL" && a !== assetFilter) return false;
-                if (searchQuery && !a.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-                return true;
-            });
-
-            const bulkTrades: Array<{
-                key: string;
-                symbol: string;
-                tf: string;
-                lot: number;
-                direction: string;
-                signalPrice: number;
-                sl: number | null;
-                tp: number | null;
-                ticket: string;
-            }> = [];
-
-            for (const asset of assets) {
-                const tfs = signalData[asset];
-                if (!tfs) continue;
-                let tfKeys = Object.keys(tfs).sort(sortTF);
-                if (actionFilter !== "ALL") tfKeys = tfKeys.filter((tf) => tfs[tf].net_signal === actionFilter);
-                if (tfFilter !== "ALL") tfKeys = tfKeys.filter((tf) => tf === tfFilter);
-
-                for (const tf of tfKeys) {
-                    const entry = tfs[tf];
-                    if (!entry.net_signal) continue;
-                    const key = `${asset}-${tf}`;
-
-                    if (executingTrades.has(key)) continue;
-                    if (autoTrades.has(key)) continue;
-
-                    const lot = lotSizes[key] || 0.01;
-                    const effectiveSymbol = symbolOverrides[asset] || asset;
-                    const direction = entry.net_signal;
-
-                    setExecutingTrades((prev) => new Set(prev).add(key));
-                    setLocalAutoActive((prev) => new Set(prev).add(key));
-                    let ticket = "";
-                    const tradeComment = `PX-Dash ${asset} ${tf}`.slice(0, 31);
-                    const existingManualPos = mt5Positions?.find((p) => p.comment === tradeComment);
-
-                    if (existingManualPos) {
-                        ticket = String(existingManualPos.ticket);
-                    }
-
-                    bulkTrades.push({
-                        key,
-                        symbol: effectiveSymbol,
-                        tf,
-                        lot,
-                        direction,
-                        signalPrice: entry.close,
-                        sl: entry.stop_loss || null,
-                        tp: entry.take_profit || null,
-                        ticket,
-                    });
-                }
-            }
-
-            if (bulkTrades.length > 0) {
-                if (addAutoTradesBulk) {
-                    await addAutoTradesBulk(bulkTrades);
-                } else {
-                    for (const tr of bulkTrades) {
-                        await addAutoTrade(
-                            tr.key,
-                            tr.symbol,
-                            tr.tf,
-                            tr.lot,
-                            tr.direction,
-                            tr.signalPrice,
-                            tr.sl,
-                            tr.tp,
-                            tr.ticket,
-                        );
-                    }
-                }
-            }
-        } finally {
-            setIsAutoExecutingAll(false);
-            // Don't just wipe out executingTrades, because bulk executes very fast, but let let them fade naturally. 
-            // the state executingTrades is managed elsewhere for single assets. But here we just leave localAutoActive true.
-        }
-    }, [addAutoTrade, mt5Connected, executingAssetBulk, globalAutoCooldown, isAutoExecutingAll, marketFilter, allAssetNames, signalData, assetFilter, searchQuery, actionFilter, tfFilter, lotSizes, symbolOverrides, executingTrades, autoTrades, mt5Positions, addAutoTradesBulk]);
-
     const [showAutoHistoryModal, setShowAutoHistoryModal] = useState(false);
     const [nextCheckStr, setNextCheckStr] = useState<string>("");
 
@@ -508,6 +374,142 @@ export function useTradingSignalsTableModel({
         for (const tfs of Object.values(signalData)) for (const tf of Object.keys(tfs)) set.add(tf);
         return Array.from(set).sort(sortTF);
     }, [signalData]);
+
+    const handleExecuteAll = useCallback(async () => {
+        if (!executeTrade || !mt5Connected || executingAssetBulk || isExecutingAll) return;
+        setIsExecutingAll(true);
+        try {
+            const currentAssetNames = Object.keys(signalData);
+            const assetsToProcess =
+                marketFilter !== "ALL"
+                    ? currentAssetNames.filter((a) => Object.values(signalData[a]).some((e) => e.market === marketFilter))
+                    : currentAssetNames;
+
+            // We basically do what handleExecuteAsset does but for all filtered assets
+            const assets = assetsToProcess.filter((a) => {
+                if (assetFilter !== "ALL" && a !== assetFilter) return false;
+                if (searchQuery && !a.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+                return true;
+            });
+
+            for (const asset of assets) {
+                const tfs = signalData[asset];
+                if (!tfs) continue;
+                let tfKeys = Object.keys(tfs).sort(sortTF);
+                if (actionFilter !== "ALL") tfKeys = tfKeys.filter((tf) => tfs[tf].net_signal === actionFilter);
+                if (tfFilter !== "ALL") tfKeys = tfKeys.filter((tf) => tf === tfFilter);
+
+                for (const tf of tfKeys) {
+                    const entry = tfs[tf];
+                    if (!entry.net_signal) continue;
+                    // handleExecuteTrade sets its own state, but we'll wait for it
+                    await handleExecuteTrade(asset, tf, entry, false);
+                }
+            }
+        } finally {
+            setIsExecutingAll(false);
+        }
+    }, [executeTrade, mt5Connected, executingAssetBulk, isExecutingAll, marketFilter, signalData, assetFilter, searchQuery, actionFilter, tfFilter, handleExecuteTrade]);
+
+    const handleAutoAll = useCallback(async () => {
+        if (!addAutoTrade || !mt5Connected || executingAssetBulk || globalAutoCooldown || isAutoExecutingAll) return;
+        setGlobalAutoCooldown(true);
+        setTimeout(() => setGlobalAutoCooldown(false), 7000);
+        setIsAutoExecutingAll(true);
+
+        try {
+            const currentAssetNames = Object.keys(signalData);
+            const assetsToProcess =
+                marketFilter !== "ALL"
+                    ? currentAssetNames.filter((a) => Object.values(signalData[a]).some((e) => e.market === marketFilter))
+                    : currentAssetNames;
+
+            const assets = assetsToProcess.filter((a) => {
+                if (assetFilter !== "ALL" && a !== assetFilter) return false;
+                if (searchQuery && !a.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+                return true;
+            });
+
+            const bulkTrades: Array<{
+                key: string;
+                symbol: string;
+                tf: string;
+                lot: number;
+                direction: string;
+                signalPrice: number;
+                sl: number | null;
+                tp: number | null;
+                ticket: string;
+            }> = [];
+
+            for (const asset of assets) {
+                const tfs = signalData[asset];
+                if (!tfs) continue;
+                let tfKeys = Object.keys(tfs).sort(sortTF);
+                if (actionFilter !== "ALL") tfKeys = tfKeys.filter((tf) => tfs[tf].net_signal === actionFilter);
+                if (tfFilter !== "ALL") tfKeys = tfKeys.filter((tf) => tf === tfFilter);
+
+                for (const tf of tfKeys) {
+                    const entry = tfs[tf];
+                    if (!entry.net_signal) continue;
+                    const key = `${asset}-${tf}`;
+
+                    if (executingTrades.has(key)) continue;
+                    if (autoTrades.has(key)) continue;
+
+                    const lot = lotSizes[key] || 0.01;
+                    const effectiveSymbol = symbolOverrides[asset] || asset;
+                    const direction = entry.net_signal;
+
+                    setExecutingTrades((prev) => new Set(prev).add(key));
+                    setLocalAutoActive((prev) => new Set(prev).add(key));
+                    let ticket = "";
+                    const tradeComment = `PX-Dash ${asset} ${tf}`.slice(0, 31);
+                    const existingManualPos = mt5Positions?.find((p) => p.comment === tradeComment);
+
+                    if (existingManualPos) {
+                        ticket = String(existingManualPos.ticket);
+                    }
+
+                    bulkTrades.push({
+                        key,
+                        symbol: effectiveSymbol,
+                        tf,
+                        lot,
+                        direction,
+                        signalPrice: entry.close,
+                        sl: entry.stop_loss || null,
+                        tp: entry.take_profit || null,
+                        ticket,
+                    });
+                }
+            }
+
+            if (bulkTrades.length > 0) {
+                if (addAutoTradesBulk) {
+                    await addAutoTradesBulk(bulkTrades);
+                } else {
+                    for (const tr of bulkTrades) {
+                        await addAutoTrade(
+                            tr.key,
+                            tr.symbol,
+                            tr.tf,
+                            tr.lot,
+                            tr.direction,
+                            tr.signalPrice,
+                            tr.sl,
+                            tr.tp,
+                            tr.ticket,
+                        );
+                    }
+                }
+            }
+        } finally {
+            setIsAutoExecutingAll(false);
+            // Don't just wipe out executingTrades, because bulk executes very fast, but let let them fade naturally. 
+            // the state executingTrades is managed elsewhere for single assets. But here we just leave localAutoActive true.
+        }
+    }, [addAutoTrade, mt5Connected, executingAssetBulk, globalAutoCooldown, isAutoExecutingAll, marketFilter, signalData, assetFilter, searchQuery, actionFilter, tfFilter, lotSizes, symbolOverrides, executingTrades, autoTrades, mt5Positions, addAutoTradesBulk]);
 
     return {
         language,
