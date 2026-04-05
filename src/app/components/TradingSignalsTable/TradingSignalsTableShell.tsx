@@ -51,6 +51,13 @@ export function TradingSignalsTableShell(props: TradingSignalsTableProps) {
                         expandAll={expandAll}
                         collapseAll={collapseAll}
                         mt5Connected={mt5Connected}
+                        globalLot={m.globalLot}
+                        setGlobalLot={m.setGlobalLot}
+                        applyGlobalLot={m.applyGlobalLot}
+                        isExecutingAll={m.isExecutingAll}
+                        isAutoExecutingAll={m.isAutoExecutingAll}
+                        handleExecuteAll={m.handleExecuteAll}
+                        handleAutoAll={m.handleAutoAll}
                     />
 
                     <TradingSignalsLivePositionsPanel m={m} />

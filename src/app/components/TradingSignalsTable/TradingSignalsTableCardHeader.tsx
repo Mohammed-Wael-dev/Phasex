@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "motion/react";
-import { Maximize2, Minimize2, Rocket, Zap } from "lucide-react";
+import { Maximize2, Minimize2, Rocket, Zap, Activity } from "lucide-react";
 import type { ThemeTokens } from "../../hooks/useThemeTokens";
 import { SciFiClock } from "../SciFiClock";
 
@@ -16,6 +16,13 @@ export function TradingSignalsTableCardHeader({
     expandAll,
     collapseAll,
     mt5Connected,
+    globalLot,
+    setGlobalLot,
+    applyGlobalLot,
+    isExecutingAll,
+    isAutoExecutingAll,
+    handleExecuteAll,
+    handleAutoAll,
 }: {
     tk: ThemeTokens;
     t: (k: string) => string;
@@ -28,6 +35,13 @@ export function TradingSignalsTableCardHeader({
     expandAll: () => void;
     collapseAll: () => void;
     mt5Connected: boolean;
+    globalLot?: number;
+    setGlobalLot?: React.Dispatch<React.SetStateAction<number>>;
+    applyGlobalLot?: (val: number) => void;
+    isExecutingAll?: boolean;
+    isAutoExecutingAll?: boolean;
+    handleExecuteAll?: () => Promise<void>;
+    handleAutoAll?: () => Promise<void>;
 }) {
     return (
         <div className="overflow-visible" style={{ borderBottom: "1px solid rgba(99,102,241,0.06)" }}>
@@ -160,6 +174,38 @@ export function TradingSignalsTableCardHeader({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 justify-center min-[801px]:justify-end overflow-visible">
+                    {mt5Connected && globalLot !== undefined && setGlobalLot && applyGlobalLot && handleExecuteAll && handleAutoAll && (
+                        <>
+                            <div className="flex items-center gap-1 md:gap-1.5 px-1.5 py-1 rounded-lg" style={{ background: tk.isDark ? "rgba(0,0,0,0.2)" : "rgba(0,0,0,0.05)", border: `1px solid ${tk.border}` }}>
+                                <span className="text-[9px] md:text-[10px] font-bold text-slate-500 whitespace-nowrap">{isRTL ? "لوت الجميع:" : "All Lots:"}</span>
+                                <button type="button" onClick={(e) => { e.stopPropagation(); const newVal = Math.max(0.01, Number((globalLot - 0.01).toFixed(2))); setGlobalLot(newVal); applyGlobalLot(newVal); }} className="w-4 h-4 md:w-5 md:h-5 flex items-center justify-center rounded text-[10px] md:text-sm font-bold bg-slate-700/50 hover:bg-slate-700 text-white transition-colors cursor-pointer">-</button>
+                                <input type="number" step="0.01" min="0.01" value={globalLot} onChange={(e) => { const newVal = Math.max(0.01, parseFloat(e.target.value) || 0.01); setGlobalLot(newVal); applyGlobalLot(newVal); }} className="w-10 md:w-12 text-center text-[10px] md:text-[11px] font-black font-mono bg-transparent outline-none" style={{ color: "#fbbf24" }} />
+                                <button type="button" onClick={(e) => { e.stopPropagation(); const newVal = Number((globalLot + 0.01).toFixed(2)); setGlobalLot(newVal); applyGlobalLot(newVal); }} className="w-4 h-4 md:w-5 md:h-5 flex items-center justify-center rounded text-[10px] md:text-sm font-bold bg-slate-700/50 hover:bg-slate-700 text-white transition-colors cursor-pointer">+</button>
+                            </div>
+                            <button type="button" onClick={handleExecuteAll} disabled={isExecutingAll || !allAssetNames.length} className="px-3 py-1.5 flex items-center gap-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: tk.isDark ? "rgba(16,185,129,0.15)" : "rgba(16,185,129,0.1)", color: tk.isDark ? "#34d399" : "#059669", border: `1px solid ${tk.isDark ? "rgba(16,185,129,0.3)" : "rgba(16,185,129,0.3)"}` }}>
+                                {isExecutingAll ? (
+                                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+                                        <Activity className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                    </motion.div>
+                                ) : (
+                                    <Activity className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                )}
+                                {isRTL ? "تنفيذ الكل" : "Execute All"}
+                            </button>
+                            <button type="button" onClick={handleAutoAll} disabled={isAutoExecutingAll || !allAssetNames.length} className="px-3 py-1.5 flex items-center gap-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: tk.isDark ? "rgba(139,92,246,0.15)" : "rgba(139,92,246,0.1)", color: tk.isDark ? "#a78bfa" : "#8b5cf6", border: `1px solid ${tk.isDark ? "rgba(139,92,246,0.3)" : "rgba(139,92,246,0.2)"}` }}>
+                                {isAutoExecutingAll ? (
+                                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+                                        <Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                    </motion.div>
+                                ) : (
+                                    <Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                )}
+                                {isRTL ? "اوتو للكل" : "Auto All"}
+                            </button>
+                            <div className="w-px h-6 mx-1" style={{ background: "rgba(99,102,241,0.1)" }} />
+                        </>
+                    )}
+
                     <motion.button
                         type="button"
                         onClick={expandAll}
